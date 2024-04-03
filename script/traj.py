@@ -1,6 +1,8 @@
 import numpy as np
 import csv
 
+import copy
+
 import sys, os
 BASEPATH = os.path.abspath(__file__).split("script/", 1)[0]
 sys.path += [BASEPATH]
@@ -20,62 +22,61 @@ class Optimization():
 
         dts = np.array([0.3]*(params._wpt_num + 1))
 
-        print("\n\nWarm-up start ......\n")
         nmpc.define_opt()
         res = nmpc.solve_opt(dts)
 
-        print("\n\nTime optimization start ......\n")
         nmpc.define_opt_t()
         res_t = nmpc.solve_opt_t()
         # Save the trajectory inside the results folder
-        # self.save_traj(res_t, nmpc, BASEPATH+"/results/traj.csv") 
-        return res_t
+        return self.minimum_time(res_t, nmpc) 
 
 
-    def save_traj(self, res, ctr: Nmpc, csv_f):
-        with open(csv_f, 'w') as f:
-            traj_writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            #TODO: modify it to match the agilicious format csv
-            labels = ['t',
-                    "p_x", "p_y", "p_z",
-                    "v_x", "v_y", "v_z",
-                    "q_w", "q_x", "q_y", "q_z",
-                    "w_x", "w_y", "w_z",
-                    "a_lin_x", "a_lin_y", "a_lin_z",
-                    "a_rot_x", "a_rot_y", "a_rot_z",
-                    "u_1", "u_2", "u_3", "u_4",
-                    "jerk_x", "jerk_y", "jerk_z",
-                    "snap_x", "snap_y", "snap_z"]
-            traj_writer.writerow(labels)
-            x = res['x'].full().flatten()
+    def minimum_time(self, res, ctr: Nmpc):
+        x = res['x'].full().flatten()
             
-            t = 0
-            s = ctr._xinit
-            u = x[ctr._Horizon*ctr._X_dim: ctr._Horizon*ctr._X_dim+ctr._U_dim]
-            u_last = u
+        t = 0
+        s = ctr._xinit
+        u = x[ctr._Horizon*ctr._X_dim: ctr._Horizon*ctr._X_dim+ctr._U_dim]
+        initial_u = copy.deepcopy(u)
+        u_last = u
 
-            ###
-            a_lin = [0,0,0]
-            a_rot = [0,0,0]
-            jerk = [0,0,0]
-            snap = [0,0,0]
+        ###
+        for i in range(ctr._seg_num):
+            # ctrimized time gap
+            dt = x[-(ctr._seg_num)+i]
+            for j in range(ctr._Ns[i]):
+                idx = ctr._N_wp_base[i]+j
+                t += dt
+                s = x[idx*ctr._X_dim: (idx+1)*ctr._X_dim]
+                if idx != ctr._Horizon-1:
+                    u = x[ctr._Horizon*ctr._X_dim+(idx+1)*ctr._U_dim: ctr._Horizon*ctr._X_dim+(idx+2)*ctr._U_dim]
+                    u_last = u
+                else:
+                    u = u_last
 
-            traj_writer.writerow([t, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8], s[9], s[10], s[11], s[12], a_lin[0], a_lin[1], a_lin[2], a_rot[0], a_rot[1], a_rot[2], u[0], u[1], u[2], u[3], jerk[0], jerk[1], jerk[2], snap[0], snap[1], snap[2]])
-            for i in range(ctr._seg_num):
-                # ctrimized time gap
-                dt = x[-(ctr._seg_num)+i]
-                for j in range(ctr._Ns[i]):
-                    idx = ctr._N_wp_base[i]+j
-                    t += dt
-                    s = x[idx*ctr._X_dim: (idx+1)*ctr._X_dim]
-                    if idx != ctr._Horizon-1:
-                        u = x[ctr._Horizon*ctr._X_dim+(idx+1)*ctr._U_dim: ctr._Horizon*ctr._X_dim+(idx+2)*ctr._U_dim]
-                        u_last = u
-                    else:
-                        u = u_last
-                    traj_writer.writerow([t, s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8], s[9], s[10], s[11], s[12], a_lin[0], a_lin[1], a_lin[2], a_rot[0], a_rot[1], a_rot[2], u[0], u[1], u[2], u[3], jerk[0], jerk[1], jerk[2], snap[0], snap[1], snap[2]])
-            print("--------------------------")
-            print("Minimum lap time: ", t)
+        return t, initial_u, u
+    
+def generate_random_states():
+
+    pos_x = np.random.rand() * 10 * np.random.randint(-1, 1)
+    pos_y = np.random.rand() * 10 * np.random.randint(-1, 1)
+    pos_z = np.random.rand() * 10 * np.random.randint(-1, 1)
+
+    vel_x = np.random.rand() * 5 * np.random.randint(-1, 1)
+    vel_y = np.random.rand() * 5 * np.random.randint(-1, 1)
+    vel_z = np.random.rand() * 5 * np.random.randint(-1, 1)
+
+    quaternion_w = np.random.rand() * np.random.randint(-1, 1)
+    quaternion_x = np.random.rand() * np.random.randint(-1, 1)
+    quaternion_y = np.random.rand() * np.random.randint(-1, 1)
+    quaternion_z = np.random.rand() * np.random.randint(-1, 1)
+
+    body_rate_x = 0
+    body_rate_y = 0
+    body_rate_z = 0
+
+    return np.array([pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, quaternion_w, quaternion_x, quaternion_y, quaternion_z, body_rate_x, body_rate_y, body_rate_z])
+
 
 
 if __name__== "__main__":
@@ -86,11 +87,43 @@ if __name__== "__main__":
     # Instantiate an NMPC planner
     optimization = Optimization(quad, params)
 
-    # Set the initial state [position, velocity, quaternion (rotation), bodyrate]
-    xinit = np.array([0,0,0, 0,0,0, 1,0,0,0, 0,0,0])
-    # Set the target state [position, velocity, quaternion (rotation), bodyrate]
-    xend = np.array([15,0,0, 0,0,0, 1,0,0,0, 0,0,0])
-    print(optimization.solve(xinit, xend))
+    count = 0
+    max_time = 0.5
+    number_of_states = 1
+
+    with open(BASEPATH+"/results/random_states.csv", 'w') as f:
+        writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        labels = ['t',
+                "p_x", "p_y", "p_z",
+                "v_x", "v_y", "v_z",
+                "q_w", "q_x", "q_y", "q_z",
+                "w_x", "w_y", "w_z",
+                "a_lin_x", "a_lin_y", "a_lin_z",
+                "a_rot_x", "a_rot_y", "a_rot_z",
+                "u_1", "u_2", "u_3", "u_4",
+                "jerk_x", "jerk_y", "jerk_z",
+                "snap_x", "snap_y", "snap_z"]
+        a_lin = [0,0,0]
+        a_rot = [0,0,0]
+        jerk = [0,0,0]
+        snap = [0,0,0]
+        writer.writerow(labels)
+
+        while (count < number_of_states):
+
+            # Set the initial state [position, velocity, quaternion (rotation), bodyrate]
+            xinit = generate_random_states()
+            # Set the target state [position, velocity, quaternion (rotation), bodyrate]
+            xend = generate_random_states()
+            
+            time, init_u, u = optimization.solve(xinit, xend)
+
+            if time < max_time:
+                writer.writerow([0, xinit[0], xinit[1], xinit[2], xinit[3], xinit[4], xinit[5], xinit[6], xinit[7], xinit[8], xinit[9], xinit[10], xinit[11], xinit[12], a_lin[0], a_lin[1], a_lin[2], a_rot[0], a_rot[1], a_rot[2], init_u[0], init_u[1], init_u[2], init_u[3], jerk[0], jerk[1], jerk[2], snap[0], snap[1], snap[2]])
+                writer.writerow([time, xend[0], xend[1], xend[2], xend[3], xend[4], xend[5], xend[6], xend[7], xend[8], xend[9], xend[10], xend[11], xend[12], a_lin[0], a_lin[1], a_lin[2], a_rot[0], a_rot[1], a_rot[2], u[0], u[1], u[2], u[3], jerk[0], jerk[1], jerk[2], snap[0], snap[1], snap[2]])
+                count += 1
+
+
 
 
 
