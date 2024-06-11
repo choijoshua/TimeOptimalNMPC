@@ -58,11 +58,6 @@ class Optimization():
                     u = u_last
 
         return t, initial_u, u
-    
-def softmax(z):
-    # Subtract the max value from z for numerical stability
-    exp_z = np.exp(z - np.max(z))
-    return np.random.choice([-1, 1]) * exp_z / np.sum(exp_z)
 
 def generate_random_states(initial):
 
