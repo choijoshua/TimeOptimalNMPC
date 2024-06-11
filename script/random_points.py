@@ -11,6 +11,9 @@ from quadrotor import QuadrotorModel
 from nmpc import Nmpc
 from nmpc_params import NmpcParams
 
+max_time = 0.8
+number_of_states = 1500
+
 
 class Optimization():
     def __init__(self, quad:QuadrotorModel, params:NmpcParams):
@@ -56,28 +59,46 @@ class Optimization():
 
         return t, initial_u, u
     
-def generate_random_states():
+def softmax(z):
+    # Subtract the max value from z for numerical stability
+    exp_z = np.exp(z - np.max(z))
+    return np.random.choice([-1, 1]) * exp_z / np.sum(exp_z)
 
-    pos_x = np.random.rand() * 10 * np.random.randint(-1, 1)
-    pos_y = np.random.rand() * 10 * np.random.randint(-1, 1)
-    pos_z = np.random.rand() * 10 * np.random.randint(-1, 1)
+def generate_random_states(initial):
 
-    vel_x = np.random.rand() * 5 * np.random.randint(-1, 1)
-    vel_y = np.random.rand() * 5 * np.random.randint(-1, 1)
-    vel_z = np.random.rand() * 5 * np.random.randint(-1, 1)
+    if initial:
+        pos_x = 0
+        pos_y = 0
+        pos_z = 0
+    
+    else:
+        pos_x = 2.5 * np.random.uniform(-1, 1)
+        pos_y = 2.5 * np.random.uniform(-1, 1)
+        pos_z = 2.5 * np.random.uniform(-1, 1)
 
-    quaternion_w = np.random.rand() * np.random.randint(-1, 1)
-    quaternion_x = np.random.rand() * np.random.randint(-1, 1)
-    quaternion_y = np.random.rand() * np.random.randint(-1, 1)
-    quaternion_z = np.random.rand() * np.random.randint(-1, 1)
+        while pos_x == 0 and pos_y == 0 and pos_z == 0:
+            pos_x = 2.5 * np.random.uniform(-1, 1)
+            pos_y = 2.5 * np.random.uniform(-1, 1)
+            pos_z = 2.5 * np.random.uniform(-1, 1)
+
+
+    vel_x = 5 * np.random.uniform(-1, 1)
+    vel_y = 5 * np.random.uniform(-1, 1)
+    vel_z = 5 * np.random.uniform(-1, 1)
+
+    quaternion_w = np.random.rand()
+    quaternion_x = np.random.rand()
+    quaternion_y = np.random.rand()
+    quaternion_z = np.random.rand()
+
+    z = [quaternion_w, quaternion_x, quaternion_y, quaternion_z]
+    z = z / np.linalg.norm(z)
 
     body_rate_x = 0
     body_rate_y = 0
     body_rate_z = 0
 
-    return np.array([pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, quaternion_w, quaternion_x, quaternion_y, quaternion_z, body_rate_x, body_rate_y, body_rate_z])
-
-
+    return np.array([pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, z[0], z[1], z[2], z[3], body_rate_x, body_rate_y, body_rate_z])
 
 if __name__== "__main__":
 
@@ -88,10 +109,8 @@ if __name__== "__main__":
     optimization = Optimization(quad, params)
 
     count = 0
-    max_time = 0.5
-    number_of_states = 1
 
-    with open(BASEPATH+"/results/random_states.csv", 'w') as f:
+    with open(BASEPATH+"/results/random_states.csv", 'a') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         labels = ['t',
                 "p_x", "p_y", "p_z",
@@ -107,17 +126,19 @@ if __name__== "__main__":
         a_rot = [0,0,0]
         jerk = [0,0,0]
         snap = [0,0,0]
-        writer.writerow(labels)
 
         while (count < number_of_states):
 
             # Set the initial state [position, velocity, quaternion (rotation), bodyrate]
-            xinit = generate_random_states()
+            xinit = generate_random_states(True)
             # Set the target state [position, velocity, quaternion (rotation), bodyrate]
-            xend = generate_random_states()
+            xend = generate_random_states(False)
             
             time, init_u, u = optimization.solve(xinit, xend)
-
+            print("--------------------")
+            print(time)
+            print(count)
+            print("--------------------")
             if time < max_time:
                 writer.writerow([0, xinit[0], xinit[1], xinit[2], xinit[3], xinit[4], xinit[5], xinit[6], xinit[7], xinit[8], xinit[9], xinit[10], xinit[11], xinit[12], a_lin[0], a_lin[1], a_lin[2], a_rot[0], a_rot[1], a_rot[2], init_u[0], init_u[1], init_u[2], init_u[3], jerk[0], jerk[1], jerk[2], snap[0], snap[1], snap[2]])
                 writer.writerow([time, xend[0], xend[1], xend[2], xend[3], xend[4], xend[5], xend[6], xend[7], xend[8], xend[9], xend[10], xend[11], xend[12], a_lin[0], a_lin[1], a_lin[2], a_rot[0], a_rot[1], a_rot[2], u[0], u[1], u[2], u[3], jerk[0], jerk[1], jerk[2], snap[0], snap[1], snap[2]])

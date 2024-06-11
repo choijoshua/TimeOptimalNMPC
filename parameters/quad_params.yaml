@@ -1,13 +1,13 @@
 #Drone 1
-mass: 0.85
-arm_length: 0.15
+mass: 1.015
+arm_length: 0.17
 torCoeff: 0.0133
 
 inertia: [0.001, 0.001, 0.0017]
 drag_coeff: [0.0, 0.0, 0.0]
 
 # maximum bodyrate in roll, pitch, and yaw
-omega_max:          [15.0, 15.0, 3.0]         # [rad/s]
+omega_max:          [6.0, 6.0, 6.0]         # [rad/s]
 
 thrust_min: 0.0
 thrust_max: 6.879   # max accel z: 24.46m/s^2
