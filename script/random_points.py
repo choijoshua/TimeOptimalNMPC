@@ -1,6 +1,6 @@
 import numpy as np
 import csv
-
+import math
 import copy
 
 import sys, os
@@ -11,7 +11,7 @@ from quadrotor import QuadrotorModel
 from nmpc import Nmpc
 from nmpc_params import NmpcParams
 
-max_time = 0.8
+max_time = 10
 number_of_states = 1500
 
 
@@ -59,6 +59,29 @@ class Optimization():
 
         return t, initial_u, u
 
+def euler_to_quaternion(roll_deg, pitch_deg, yaw_deg):
+
+    # Convert degrees to radians
+    roll = math.radians(roll_deg)
+    pitch = math.radians(pitch_deg)
+    yaw = math.radians(yaw_deg)
+    
+    # Compute the half-angles
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+    
+    # Compute quaternion components
+    w = cy * cp * cr + sy * sp * sr
+    x = cy * cp * sr - sy * sp * cr
+    y = sy * cp * sr + cy * sp * cr
+    z = sy * cp * cr - cy * sp * sr
+    
+    return x, y, z, w
+
 def generate_random_states(initial):
 
     if initial:
@@ -67,28 +90,27 @@ def generate_random_states(initial):
         pos_z = 0
     
     else:
-        pos_x = 2.5 * np.random.uniform(-1, 1)
-        pos_y = 2.5 * np.random.uniform(-1, 1)
-        pos_z = 2.5 * np.random.uniform(-1, 1)
+        pos_x = 5 * np.random.uniform(-1, 1)
+        pos_y = 5 * np.random.uniform(-1, 1)
+        pos_z = 5 * np.random.uniform(-1, 1)
 
         while pos_x == 0 and pos_y == 0 and pos_z == 0:
-            pos_x = 2.5 * np.random.uniform(-1, 1)
-            pos_y = 2.5 * np.random.uniform(-1, 1)
-            pos_z = 2.5 * np.random.uniform(-1, 1)
+            pos_x = 5 * np.random.uniform(-1, 1)
+            pos_y = 5 * np.random.uniform(-1, 1)
+            pos_z = 5 * np.random.uniform(-1, 1)
 
+    roll = np.random.uniform(-125, 75)
+    pitch = np.random.uniform(-77, 83)
+    yaw = np.random.uniform(-180, 180)
 
-    vel_x = 5 * np.random.uniform(-1, 1)
-    vel_y = 5 * np.random.uniform(-1, 1)
-    vel_z = 5 * np.random.uniform(-1, 1)
+    z = [0, 0, 0, 0]
+    z[3], z[0], z[1], z[2] = euler_to_quaternion(roll, pitch, yaw)
 
-    quaternion_w = np.random.rand()
-    quaternion_x = np.random.rand()
-    quaternion_y = np.random.rand()
-    quaternion_z = np.random.rand()
-
-    z = [quaternion_w, quaternion_x, quaternion_y, quaternion_z]
-    z = z / np.linalg.norm(z)
-
+    vel_norm = np.random.uniform(0, 5)
+    vel_x = vel_norm * math.cos(math.radians(roll))
+    vel_y = vel_norm * math.cos(math.radians(pitch))
+    vel_z = vel_norm * math.cos(math.radians(yaw))
+    
     body_rate_x = 0
     body_rate_y = 0
     body_rate_z = 0
@@ -105,7 +127,7 @@ if __name__== "__main__":
 
     count = 0
 
-    with open(BASEPATH+"/results/random_states.csv", 'a') as f:
+    with open(BASEPATH+"/results/random_states.csv", 'w') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         labels = ['t',
                 "p_x", "p_y", "p_z",
