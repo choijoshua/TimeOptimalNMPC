@@ -80,7 +80,7 @@ def euler_to_quaternion(roll_deg, pitch_deg, yaw_deg):
     y = sy * cp * sr + cy * sp * cr
     z = sy * cp * cr - cy * sp * sr
     
-    return x, y, z, w
+    return w, x, y, z
 
 def generate_random_states(initial):
 
@@ -104,7 +104,7 @@ def generate_random_states(initial):
     yaw = np.random.uniform(-180, 180)
 
     z = [0, 0, 0, 0]
-    z[3], z[0], z[1], z[2] = euler_to_quaternion(roll, pitch, yaw)
+    z[0], z[1], z[2], z[3] = euler_to_quaternion(roll, pitch, yaw)
 
     vel_norm = np.random.uniform(0, 5)
     vel_x = vel_norm * math.cos(math.radians(roll))
