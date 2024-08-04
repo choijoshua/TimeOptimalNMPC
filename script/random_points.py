@@ -139,6 +139,7 @@ if __name__== "__main__":
                 "u_1", "u_2", "u_3", "u_4",
                 "jerk_x", "jerk_y", "jerk_z",
                 "snap_x", "snap_y", "snap_z"]
+        writer.writerow(labels)
         a_lin = [0,0,0]
         a_rot = [0,0,0]
         jerk = [0,0,0]
